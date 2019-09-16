@@ -8,7 +8,7 @@ Pod::Spec.new do |s|
   s.homepage = 'git@github.com:maloneranger/customer-ios.git'
   s.source = {
     :git => 'git@github.com:maloneranger/customer-ios.git',
-    :branch => s.branch.to_s
+    :tag => s.version.to_s
   }
 
   s.dependency 'libPusher', '~> 1.6.3'
