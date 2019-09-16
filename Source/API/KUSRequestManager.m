@@ -18,6 +18,7 @@
 NSString *const kKustomerTrackingTokenHeaderKey = @"x-kustomer-tracking-token";
 
 typedef void (^KUSTrackingTokenCompletion)(NSError *error, NSString *trackingToken);
+typedef NSURLRequest *_Nullable(^URLRequestModifier)(NSURLRequest * _Nonnull request);
 
 @interface KUSRequestManager () <KUSObjectDataSourceListener> {
     __weak KUSUserSession *_userSession;
@@ -63,7 +64,8 @@ typedef void (^KUSTrackingTokenCompletion)(NSError *error, NSString *trackingTok
 
         [_userSession.trackingTokenDataSource addListener:self];
 
-        [[SDWebImageDownloader sharedDownloader] setHeadersFilter:[self _sdWebImageHeadersFilter]];
+        SDWebImageDownloaderRequestModifier *requestModifier = [SDWebImageDownloaderRequestModifier requestModifierWithBlock: [self _sdWebImageURLRequestModifier]];
+        [[SDWebImageDownloader sharedDownloader] setRequestModifier: requestModifier];
     }
     return self;
 }
@@ -258,31 +260,64 @@ typedef void (^KUSTrackingTokenCompletion)(NSError *error, NSString *trackingTok
     }
 }
 
-- (SDHTTPHeadersDictionary *(^)(NSURL *url, SDHTTPHeadersDictionary *headers))_sdWebImageHeadersFilter
+//- (SDHTTPHeadersDictionary *(^)(NSURL *url, SDHTTPHeadersDictionary *headers))_sdWebImageHeadersFilter
+//{
+//    __weak KUSRequestManager *weakSelf = self;
+//    return ^SDHTTPHeadersDictionary *(NSURL * url, SDHTTPHeadersDictionary *headers) {
+//        __strong KUSRequestManager *strongSelf = weakSelf;
+//        if (strongSelf == nil) {
+//            return headers;
+//        }
+//
+//        // Only attach auth headers to Kustomer requests
+//        BOOL isKustomer = [url.absoluteString hasPrefix:self->_baseUrlString];
+//        if (isKustomer) {
+//            NSMutableDictionary<NSString *, NSString *> *responseHeaders = [(headers ?: @{}) mutableCopy];
+//            [responseHeaders addEntriesFromDictionary:strongSelf->_genericHTTPHeaderValues];
+//
+//            // Tracking token
+//            NSString *trackingToken = strongSelf->_userSession.trackingTokenDataSource.currentTrackingToken;
+//            if (trackingToken) {
+//                [responseHeaders setObject:trackingToken forKey:kKustomerTrackingTokenHeaderKey];
+//            }
+//
+//            return responseHeaders;
+//        }
+//
+//        return headers;
+//    };
+//}
+
+- (URLRequestModifier)_sdWebImageURLRequestModifier 
 {
     __weak KUSRequestManager *weakSelf = self;
-    return ^SDHTTPHeadersDictionary *(NSURL * url, SDHTTPHeadersDictionary *headers) {
+    return ^NSURLRequest *_Nullable(NSURLRequest * _Nonnull request) {
         __strong KUSRequestManager *strongSelf = weakSelf;
         if (strongSelf == nil) {
-            return headers;
+            return request;
         }
-
+        
         // Only attach auth headers to Kustomer requests
-        BOOL isKustomer = [url.absoluteString hasPrefix:self->_baseUrlString];
+        NSURL *url = request.URL;
+        BOOL isKustomer = [url.absoluteString hasPrefix:strongSelf->_baseUrlString];
         if (isKustomer) {
-            NSMutableDictionary<NSString *, NSString *> *responseHeaders = [(headers ?: @{}) mutableCopy];
-            [responseHeaders addEntriesFromDictionary:strongSelf->_genericHTTPHeaderValues];
-
+            NSMutableURLRequest *mutableRequest = [request mutableCopy];
+            
+            for (NSString *key in strongSelf->_genericHTTPHeaderValues) {
+                NSString *value = [strongSelf->_genericHTTPHeaderValues valueForKey:key];
+                [mutableRequest setValue:value forHTTPHeaderField:key];
+            }
+            
             // Tracking token
             NSString *trackingToken = strongSelf->_userSession.trackingTokenDataSource.currentTrackingToken;
             if (trackingToken) {
-                [responseHeaders setObject:trackingToken forKey:kKustomerTrackingTokenHeaderKey];
+                [mutableRequest setValue:trackingToken forHTTPHeaderField:kKustomerTrackingTokenHeaderKey];
             }
-
-            return responseHeaders;
+            
+            return mutableRequest;
         }
-
-        return headers;
+        
+        return request;
     };
 }
 
