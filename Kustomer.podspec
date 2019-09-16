@@ -1,5 +1,5 @@
 Pod::Spec.new do |s|
-  s.name = 'Kustomer - SDKWebImage Update Fork'
+  s.name = 'Kustomer'
   s.authors = 'Kustomer.com'
   s.summary = 'The iOS SDK for the Kustomer.com mobile client - forked to update SDWebImage'
   s.version = '0.2.3'
